@@ -1,0 +1,77 @@
+name: Codex Android Release Build
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "codex-build-*"
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: simple-live-app
+            package_dir: simple_live_app
+            key_alias: simple_live_app
+          - name: simple-live-tv-app
+            package_dir: simple_live_tv_app
+            key_alias: simple_live_tv_app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: "17"
+          cache: gradle
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.38.x"
+          channel: stable
+          cache: true
+
+      - name: Create temporary release key
+        working-directory: ${{ matrix.package_dir }}/android
+        run: |
+          keytool -genkeypair \
+            -v \
+            -storetype JKS \
+            -keystore codex-release-key.jks \
+            -storepass codex-release-pass \
+            -keypass codex-release-pass \
+            -alias "${{ matrix.key_alias }}" \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=Codex Build, OU=Codex, O=Local, L=Local, S=Local, C=US"
+
+          {
+            echo "storeFile=codex-release-key.jks"
+            echo "storePassword=codex-release-pass"
+            echo "keyPassword=codex-release-pass"
+            echo "keyAlias=${{ matrix.key_alias }}"
+          } > key.properties
+
+      - name: Restore packages
+        working-directory: ${{ matrix.package_dir }}
+        run: flutter pub get
+
+      - name: Build release APKs
+        working-directory: ${{ matrix.package_dir }}
+        run: flutter build apk --release --split-per-abi
+
+      - name: Upload APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}-release-apks
+          path: ${{ matrix.package_dir }}/build/app/outputs/flutter-apk/*-release.apk
+          if-no-files-found: error
