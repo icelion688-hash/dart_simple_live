@@ -3,6 +3,8 @@ name: Codex Release Build
 on:
   workflow_dispatch:
   push:
+    branches:
+      - master
     tags:
       - "codex-build-*"
       - "codex-release-*"
