@@ -67,7 +67,39 @@ jobs:
 
       - name: Build release APKs
         working-directory: ${{ matrix.package_dir }}
-        run: flutter build apk --release --split-per-abi
+        run: |
+          set +e
+          flutter build apk --release --split-per-abi 2>&1 | tee build.log
+          status=${PIPESTATUS[0]}
+
+          if [ "$status" -ne 0 ]; then
+            tail -n 120 build.log > build-tail.log
+            {
+              echo "### ${{ matrix.name }} build log tail"
+              echo '```text'
+              cat build-tail.log
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+
+            message=$(python3 - <<'PY'
+from pathlib import Path
+
+text = Path("build-tail.log").read_text(errors="replace")[-7000:]
+text = text.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+print(text)
+PY
+)
+            echo "::error title=Flutter build failed::$message"
+            exit "$status"
+          fi
+
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}-build-logs
+          path: ${{ matrix.package_dir }}/build*.log
+          if-no-files-found: ignore
 
       - name: Upload APKs
         uses: actions/upload-artifact@v4
