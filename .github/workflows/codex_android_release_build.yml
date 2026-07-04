@@ -1,4 +1,4 @@
-name: Codex Android Release Build
+name: Codex Release Build
 
 on:
   workflow_dispatch:
@@ -99,4 +99,69 @@ jobs:
         with:
           name: ${{ matrix.name }}-release-apks
           path: ${{ matrix.package_dir }}/build/app/outputs/flutter-apk/*-release.apk
+          if-no-files-found: error
+
+  build-windows:
+    name: Build simple-live-app Windows
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.38.x"
+          channel: stable
+          cache: true
+
+      - name: Enable Windows desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Restore packages
+        working-directory: simple_live_app
+        run: flutter pub get
+
+      - name: Install flutter_distributor
+        run: dart pub global activate flutter_distributor
+
+      - name: Build Windows packages
+        working-directory: simple_live_app
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Continue"
+          flutter_distributor package --platform windows --targets msix,zip --skip-clean *>&1 | Tee-Object -FilePath build-windows.log
+          $status = $LASTEXITCODE
+
+          if ($status -ne 0) {
+            Get-Content -Path build-windows.log -Tail 160 | Set-Content -Path build-windows-tail.log
+            Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "### simple-live-app Windows build log tail"
+            Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value '```text'
+            Get-Content -Path build-windows-tail.log | Add-Content -Path $env:GITHUB_STEP_SUMMARY
+            Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value '```'
+
+            $message = (Get-Content -Path build-windows-tail.log -Raw).
+              Replace('%', '%25').
+              Replace("`r", '%0D').
+              Replace("`n", '%0A')
+            Write-Output "::error title=Windows build failed::$message"
+            exit $status
+          }
+
+      - name: Upload Windows build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: simple-live-app-windows-build-logs
+          path: simple_live_app/build-windows*.log
+          if-no-files-found: ignore
+
+      - name: Upload Windows packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: simple-live-app-windows-packages
+          path: |
+            simple_live_app/build/dist/**/*.msix
+            simple_live_app/build/dist/**/*.zip
           if-no-files-found: error
