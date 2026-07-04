@@ -81,14 +81,7 @@ jobs:
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
 
-            message=$(python3 - <<'PY'
-from pathlib import Path
-
-text = Path("build-tail.log").read_text(errors="replace")[-7000:]
-text = text.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
-print(text)
-PY
-)
+            message=$(python3 -c 'from pathlib import Path; text = Path("build-tail.log").read_text(errors="replace")[-7000:]; print(text.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A"))')
             echo "::error title=Flutter build failed::$message"
             exit "$status"
           fi
