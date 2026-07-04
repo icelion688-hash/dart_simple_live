@@ -45,7 +45,7 @@ jobs:
           keytool -genkeypair \
             -v \
             -storetype JKS \
-            -keystore codex-release-key.jks \
+            -keystore app/codex-release-key.jks \
             -storepass codex-release-pass \
             -keypass codex-release-pass \
             -alias "${{ matrix.key_alias }}" \
