@@ -131,6 +131,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Continue"
+          $env:CL = "/D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS $env:CL"
           flutter_distributor package --platform windows --targets msix,zip --skip-clean *>&1 | Tee-Object -FilePath build-windows.log
           $status = $LASTEXITCODE
 
